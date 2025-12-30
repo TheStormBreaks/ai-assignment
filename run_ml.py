@@ -120,6 +120,11 @@ def main():
     # if you keep the CSV elsewhere.
     parser.add_argument('--csv', type=str, default=r"C:\Users\Sumi\OneDrive\Desktop\Documents\GitHub\ai-assignment\microbiology_cultures_microbial_resistance.csv")
     parser.add_argument('--outdir', type=str, default='ml_project')
+    # Sampling options for fast, approximate runs
+    parser.add_argument('--sample-frac', type=float, default=None,
+                        help='If set, randomly sample this fraction of rows (0-1) before processing.')
+    parser.add_argument('--sample-size', type=int, default=None,
+                        help='If set, randomly sample this many rows before processing (overrides --sample-frac).')
     args = parser.parse_args()
 
     # Ensure output directory exists (no-op if already present)
@@ -128,6 +133,23 @@ def main():
     print('Loading CSV (this may take a moment)...')
     # Use low_memory=False to avoid dtype inference issues across chunks
     df = pd.read_csv(args.csv, low_memory=False)
+
+    # If the user requested sampling, take a random sample to speed up
+    # preprocessing and model training. `--sample-size` takes precedence
+    # over `--sample-frac` when both are provided.
+    if args.sample_size is not None:
+        n = args.sample_size
+        if n <= 0:
+            raise ValueError('--sample-size must be > 0')
+        n = min(n, len(df))
+        print(f'Sampling {n} rows (sample-size) from {len(df)} total rows...')
+        df = df.sample(n=n, random_state=42)
+    elif args.sample_frac is not None:
+        frac = args.sample_frac
+        if not (0 < frac <= 1.0):
+            raise ValueError('--sample-frac must be between 0 (exclusive) and 1 (inclusive)')
+        print(f'Sampling fraction {frac} of rows from {len(df)} total rows...')
+        df = df.sample(frac=frac, random_state=42)
 
     # Quick summary and sampling to help the user confirm the dataset loaded
     print('\n--- Data summary ---')
